@@ -1,0 +1,154 @@
+import AppKit
+import Combine
+import SwiftUI
+
+@MainActor
+final class IslandSession: ObservableObject {
+    @Published var isExpanded = false
+    @Published var geometry: NotchGeometry
+    @Published private(set) var hasActivity = false
+
+    let timer: TimerController
+    let recorder: RecorderController
+    let chat: ChatController
+    @Published var tab: IslandTab = .timer
+    private var bag = Set<AnyCancellable>()
+
+    /// Only the assistant tab is taller; timer and recorder share the compact height.
+    static func expandedHeight(for tab: IslandTab) -> CGFloat {
+        tab == .chat ? IslandMetrics.chatHeight : IslandMetrics.expandedSize.height
+    }
+    var expandedHeight: CGFloat { Self.expandedHeight(for: tab) }
+
+    init(geometry: NotchGeometry) {
+        let timer = TimerController()
+        let recorder = RecorderController()
+        self.timer = timer
+        self.recorder = recorder
+        self.chat = ChatController(timer: timer, recorder: recorder)
+        self.geometry = geometry
+
+        Publishers.CombineLatest(timer.$isRunning, recorder.$isRecording)
+            .map { $0 || $1 }
+            .removeDuplicates()
+            .sink { [weak self] active in self?.hasActivity = active }
+            .store(in: &bag)
+    }
+
+    func quit() {
+        recorder.stop()
+        NSApp.terminate(nil)
+    }
+}
+
+@MainActor
+final class IslandController {
+    private let session: IslandSession
+    private let panel = NotchPanel()
+    private let hover = NotchHoverMonitor()
+    private var screenObserver: NSObjectProtocol?
+    private var bag = Set<AnyCancellable>()
+
+    init() {
+        let geometry = NotchGeometry.current() ?? NotchGeometry(
+            screenID: 0,
+            screenFrame: NSScreen.main?.frame ?? .zero,
+            notchFrame: NSRect(x: 0, y: 0, width: 160, height: 32),
+            usingPhysicalNotch: false
+        )
+        session = IslandSession(geometry: geometry)
+    }
+
+    func start() {
+        let hosting = IslandHostingView(
+            rootView: IslandView(session: session, timer: session.timer, recorder: session.recorder)
+        )
+        hosting.safeAreaRegions = []
+        hosting.wantsLayer = true
+        hosting.layer?.backgroundColor = NSColor.clear.cgColor
+        panel.contentView = hosting
+
+        hover.onHoverChange = { [weak self] hovering in
+            self?.setExpanded(hovering)
+        }
+        hover.start()
+
+        // Keep the panel visible (as a compact live activity) while a timer or recording runs.
+        session.$hasActivity
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.refreshVisibility() }
+            .store(in: &bag)
+
+        // Keep the hover area in step with the island's height when switching tabs.
+        session.$tab
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] tab in
+                guard let self else { return }
+                self.hover.update(
+                    geometry: self.session.geometry,
+                    isExpanded: self.session.isExpanded,
+                    expandedHeight: IslandSession.expandedHeight(for: tab)
+                )
+            }
+            .store(in: &bag)
+
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.relayout()
+            }
+        }
+
+        relayout()
+        panel.alphaValue = 0
+        panel.ignoresMouseEvents = true
+        panel.orderFrontRegardless()
+    }
+
+    func shutdown() {
+        session.recorder.stop()
+    }
+
+    func openMemosFolder() {
+        try? FileManager.default.createDirectory(at: RecorderController.memosFolder, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(RecorderController.memosFolder)
+    }
+
+    private func setExpanded(_ expanded: Bool) {
+        guard expanded != session.isExpanded else {
+            hover.update(geometry: session.geometry, isExpanded: session.isExpanded)
+            return
+        }
+
+        // The view picks the animation (springy open, quick close).
+        session.isExpanded = expanded
+
+        refreshVisibility()
+        hover.update(geometry: session.geometry, isExpanded: session.isExpanded)
+    }
+
+    private func refreshVisibility() {
+        panel.ignoresMouseEvents = !session.isExpanded
+
+        if session.isExpanded || session.hasActivity {
+            panel.alphaValue = 1
+            panel.orderFrontRegardless()
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                guard let self, !self.session.isExpanded, !self.session.hasActivity else { return }
+                self.panel.alphaValue = 0
+                self.panel.ignoresMouseEvents = true
+            }
+        }
+    }
+
+    private func relayout() {
+        guard let next = NotchGeometry.current() else { return }
+        session.geometry = next
+        panel.setFrame(next.windowFrame, display: true)
+        hover.update(geometry: next, isExpanded: session.isExpanded)
+    }
+}
