@@ -40,7 +40,7 @@ final class NotchPanel: NSPanel {
             .ignoresCycle
         ]
         level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.statusWindow)) + 1)
-        sharingType = .none
+        sharingType = .readOnly
     }
 }
 
