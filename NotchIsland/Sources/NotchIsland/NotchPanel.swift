@@ -21,6 +21,11 @@ final class NotchPanel: NSPanel {
         hidesOnDeactivate = false
         isMovable = false
         isMovableByWindowBackground = false
+        // The island is always dark. Without this the caret, selection and text-field chrome
+        // follow the system appearance and the caret turns black-on-black in light mode.
+        appearance = NSAppearance(named: .darkAqua)
+        // Needed for cursor tracking while the app is inactive.
+        acceptsMouseMovedEvents = true
         isRestorable = false
         animationBehavior = .none
         titleVisibility = .hidden

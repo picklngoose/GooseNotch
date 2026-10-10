@@ -26,6 +26,10 @@
     <string>Goosenotch records voice memos from your microphone.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Goosenotch reads the current track and controls playback in Apple Music.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Goosenotch shows your upcoming events and a countdown to the next one. It only reads your calendar and never changes it.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Goosenotch shows your upcoming events and a countdown to the next one. It only reads your calendar and never changes it.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>Goosenotch transcribes your voice memos live.</string>
 </dict>

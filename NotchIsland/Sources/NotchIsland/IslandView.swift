@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum IslandTab: Hashable {
-    case timer, chat, music, record
+    case timer, chat, music, record, calendar
 }
 
 struct IslandView: View {
@@ -10,6 +10,7 @@ struct IslandView: View {
     @ObservedObject var timer: TimerController
     @ObservedObject var recorder: RecorderController
     @ObservedObject var music: MusicController
+    @ObservedObject var calendar: CalendarController
     @State private var showingModelPrompt = false
     @State private var customModelName = ""
 
@@ -33,12 +34,13 @@ struct IslandView: View {
             // Content stays in the tree and is clipped by the (animating) island shape, so on
             // collapse it looks like the notch closes around it instead of the content vanishing.
             content(notch: notch)
-                .scaleEffect(expanded ? 1 : 0.96, anchor: .top)
+                .scaleEffect(expanded ? 1 : 0.94, anchor: .top)
+                .blur(radius: expanded ? 0 : 6)
                 .opacity(expanded ? 1 : 0)
                 .animation(
                     expanded
-                        ? Animation.easeOut(duration: 0.24).delay(0.08)
-                        : Animation.easeIn(duration: 0.16).delay(0.04),
+                        ? Animation.easeOut(duration: 0.26).delay(0.07)
+                        : Animation.easeIn(duration: 0.14),
                     value: expanded
                 )
                 .mask(alignment: .top) {
@@ -60,21 +62,19 @@ struct IslandView: View {
             alignment: .top
         )
         .environment(\.colorScheme, .dark)
-        .tint(Color(white: 0.78))
-        .animation(
-            expanded
-                ? Animation.spring(response: 0.38, dampingFraction: 0.84)
-                : Animation.smooth(duration: 0.3),
-            value: expanded
-        )
-        .animation(.easeInOut(duration: 0.25), value: session.hasActivity)
+        .tint(IslandPalette.accent)
+        .animation(expanded ? IslandMotion.open : IslandMotion.close, value: expanded)
+        .animation(.smooth(duration: 0.3), value: session.hasActivity)
         .onChange(of: recorder.isRecording) { _, recording in
-            if recording { withAnimation(.smooth(duration: 0.28)) { session.tab = .record } }
+            if recording { withAnimation(IslandMotion.tab) { session.tab = .record } }
         }
         .onChange(of: expanded) { _, isOpen in
             // Drop keyboard focus (e.g. mid-edit on the timer) when the island closes.
             if !isOpen {
                 NSApp.windows.first(where: { $0 is NotchPanel })?.makeFirstResponder(nil)
+            } else {
+                // Pick up edits made in Calendar, or access granted in System Settings.
+                calendar.refresh()
             }
         }
         .contextMenu {
@@ -98,39 +98,12 @@ struct IslandView: View {
             cornerRadius: cornerRadius
         )
         ZStack {
-            shape.fill(Color.black.opacity(0.01))
-                .islandGlass(
-                    shape,
-                    tint: appearance.tintStrength > 0 ? appearance.tintColor : nil,
-                    tintStrength: appearance.tintStrength,
-                    clear: appearance.blur == .subtle,
-                    blur: appearance.blur,
-                    refraction: true
-                )
-                .mask(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0.3),
-                            .init(color: .black.opacity(0.35), location: 1)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            shape.fill(
-                LinearGradient(
-                    stops: [
-                        .init(color: .black, location: 0),
-                        .init(color: .black, location: 0.34),
-                        .init(color: .black.opacity(0.22), location: 0.72),
-                        .init(color: .black.opacity(0.0), location: 1)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            if appearance.tintStrength > 0 {
-                shape.fill(appearance.tintColor.opacity(appearance.tintStrength))
+            switch appearance.style {
+            case .solidBlack:
+                // Exactly the notch's black, so the island reads as one object growing out of it.
+                shape.fill(Color.black)
+            case .liquidGlass:
+                glassBody(shape)
             }
             // Thin bright rim that strengthens toward the bottom, like real glass edges.
             shape.stroke(
@@ -149,24 +122,68 @@ struct IslandView: View {
         .frame(width: expandedWidth, height: session.expandedHeight)
     }
 
+    /// Frosted Liquid Glass underneath, with black laid over the top that fades out downward.
+    /// "Black fade-out" moves where the black ends; "Glass density" sets how frosted the glass is.
+    private func glassBody(_ shape: ConnectedIslandShape) -> some View {
+        let fade = appearance.fade
+        let solidStop = 0.55 - 0.35 * fade
+        // At full fade-out the bottom is completely clear.
+        let bottomAlpha = 1 - fade
+        return ZStack {
+            shape.fill(Color.black.opacity(0.01))
+                .islandGlass(shape, blur: appearance.blur, refraction: true)
+                .opacity(appearance.glassDensity)
+
+            shape.fill(
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .black, location: solidStop),
+                        .init(color: .black.opacity(bottomAlpha + (1 - bottomAlpha) * 0.35), location: solidStop + (1 - solidStop) * 0.55),
+                        .init(color: .black.opacity(bottomAlpha), location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+
+            if appearance.tintStrength > 0 {
+                // Fades in from the bottom so the top stays notch-black.
+                shape.fill(
+                    LinearGradient(
+                        colors: [.clear, appearance.tintColor.opacity(appearance.tintStrength)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+            }
+        }
+    }
+
     // MARK: Expanded content
 
     private func content(notch: NSSize) -> some View {
-        VStack(spacing: 10) {
+        VStack(spacing: IslandSpacing.m) {
             topRow(notch: notch)
-            Group {
-                switch tab {
-                case .timer: TimerPanel(timer: timer)
-                case .chat: ChatPanel(chat: session.chat)
-                case .music: MusicPanel(music: music)
-                case .record: RecorderPanel(recorder: recorder)
+            // Stacked, not laid out in sequence, so the outgoing tab never pushes the new one.
+            ZStack(alignment: .top) {
+                Group {
+                    switch tab {
+                    case .timer: TimerPanel(timer: timer)
+                    case .chat: ChatPanel(chat: session.chat, isActive: expanded)
+                    case .music: MusicPanel(music: music)
+                    case .record: RecorderPanel(recorder: recorder)
+                    case .calendar: CalendarPanel(calendar: calendar, isActive: expanded)
+                    }
                 }
+                .id(tab)
+                .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }
         .padding(.top, 0)
         .padding(.horizontal, 38)
-        .padding(.bottom, 16)
+        .padding(.bottom, IslandSpacing.l)
         .frame(
             width: expandedWidth,
             height: session.expandedHeight,
@@ -176,9 +193,11 @@ struct IslandView: View {
 
     /// Tabs sit level with the notch, split around it so nothing ends up underneath it.
     private func topRow(notch: NSSize) -> some View {
-        let zone = max((expandedWidth - 76 - notch.width) / 2 - 8, 60)
+        // The row may use a little of the side padding: at notch height the body is full width.
+        let rowWidth = expandedWidth - 56
+        let zone = max((rowWidth - notch.width) / 2 - 8, 60)
         return HStack(spacing: 0) {
-            HStack(spacing: 6) {
+            HStack(spacing: IslandSpacing.xs + 2) {
                 tabChip(.music, icon: "music.note", label: "Music", tint: IslandPalette.music)
                 tabChip(.timer, icon: "timer", label: "Timer", tint: IslandPalette.timer)
                 tabChip(.chat, icon: "sparkles", label: "Assistant", tint: IslandPalette.assistant)
@@ -187,18 +206,19 @@ struct IslandView: View {
 
             Color.clear.frame(width: notch.width + 16)
 
-            HStack(spacing: 6) {
+            HStack(spacing: IslandSpacing.xs + 2) {
                 if tab == .chat { modelMenu }
+                tabChip(.calendar, icon: "calendar", label: "Calendar", tint: IslandPalette.calendar)
                 tabChip(.record, icon: "waveform", label: "Record", tint: IslandPalette.recorder)
             }
             .frame(width: zone, alignment: .trailing)
         }
-        .frame(height: notch.height)
+        .frame(width: rowWidth, height: notch.height)
     }
 
     private func tabChip(_ target: IslandTab, icon: String, label: String, tint: Color) -> some View {
         GlassChip(title: "", systemImage: icon, isSelected: tab == target, tint: tint) {
-            withAnimation(.smooth(duration: 0.28)) { session.tab = target }
+            withAnimation(IslandMotion.tab) { session.tab = target }
         }
         .accessibilityLabel(label)
         .help(label)
@@ -234,7 +254,7 @@ struct IslandView: View {
                     .truncationMode(.middle)
                     .foregroundStyle(.white)
             }
-                .frame(maxWidth: 52)
+                .frame(maxWidth: 40)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .islandGlass(Capsule())
@@ -271,9 +291,11 @@ struct IslandView: View {
                 MiniMeter(levels: Array(recorder.levels.suffix(5)))
                     .frame(width: 22, height: 14)
             }
+        } else if let event = session.upcomingEvent, !timer.isRunning {
+            EventWingIcon(event: event)
         } else if music.isPlaying {
-            MusicVisualizer(isPlaying: true, barCount: 5)
-                .frame(width: 22, height: 14)
+            MusicVisualizer(isPlaying: true, barCount: 5, color: music.accentColor ?? .white)
+                .frame(width: 22, height: 16)
         } else {
             Image(systemName: timer.mode == .countdown ? "timer" : "stopwatch")
                 .font(.system(size: 12, weight: .semibold))
@@ -293,6 +315,40 @@ struct IslandView: View {
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.white)
+        } else if let event = session.upcomingEvent {
+            EventWingCountdown(start: event.start)
+        }
+    }
+}
+
+// MARK: - Upcoming event beside the closed notch
+
+private struct EventWingIcon: View {
+    let event: CalendarEvent
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(Color(nsColor: event.calendarColor))
+                .frame(width: 6, height: 6)
+            Image(systemName: "calendar")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(IslandPalette.calendar)
+        }
+        .accessibilityLabel("\(event.title) is about to start")
+    }
+}
+
+private struct EventWingCountdown: View {
+    let start: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            Text(CalendarFormat.shortCountdown(start.timeIntervalSince(timeline.date)))
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(IslandPalette.calendar)
+                .contentTransition(.numericText(countsDown: true))
         }
     }
 }
@@ -309,7 +365,7 @@ struct TimerPanel: View {
     private let accent = IslandPalette.timer
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: IslandSpacing.m) {
             HStack {
                 timeDisplay
                 Spacer()
@@ -476,8 +532,8 @@ struct RecorderPanel: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 12) {
+        VStack(spacing: IslandSpacing.m) {
+            HStack(spacing: IslandSpacing.m) {
                 GlassIconButton(
                     systemName: recorder.isRecording ? "stop.fill" : "mic.fill",
                     label: recorder.isRecording ? "Stop recording" : "Start recording",

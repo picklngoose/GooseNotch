@@ -58,6 +58,7 @@ final class TimerController: ObservableObject {
             return
         }
         if mode == .countdown, elapsed >= duration { reset() }
+        if mode == .countdown { TimerAlert.shared.prepare() }
         startDate = Date()
         isRunning = true
         startTicker()
@@ -93,7 +94,7 @@ final class TimerController: ObservableObject {
             accumulated = duration
             stopTicker()
             isRunning = false
-            NSSound(named: NSSound.Name("Glass"))?.play()
+            TimerAlert.shared.timerFinished(duration: duration)
         }
     }
 }

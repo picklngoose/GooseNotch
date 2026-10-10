@@ -14,7 +14,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp ".build/release/NotchIsland" "$APP/Contents/MacOS/NotchIsland"
 cp Info.plist "$APP/Contents/Info.plist"
 
-# Ad-hoc sign so macOS keeps the mic / speech permissions between launches.
+# Ad-hoc sign so macOS keeps the mic / speech / calendar permissions between launches.
 codesign --force --deep --sign - --entitlements NotchIsland.entitlements "$APP"
 
 echo "Built $APP"

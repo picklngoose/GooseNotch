@@ -1,11 +1,55 @@
 import AppKit
 import SwiftUI
 
+/// Muted, cool-leaning tones that share one softness (similar lightness, low saturation), so
+/// each tab is recognisable without anything competing for attention on the dark island.
 enum IslandPalette {
-    static let timer = Color(white: 0.78)
-    static let assistant = Color(white: 0.94)
-    static let music = Color(white: 0.86)
-    static let recorder = Color(white: 0.64)
+    /// Dusty sky blue.
+    static let timer = Color(red: 0.55, green: 0.72, blue: 0.88)
+    /// Soft periwinkle.
+    static let assistant = Color(red: 0.69, green: 0.67, blue: 0.90)
+    /// Muted rose. Replaced by the artwork's colour while a track with artwork is playing.
+    static let music = Color(red: 0.88, green: 0.64, blue: 0.72)
+    /// Soft terracotta; warm so recording reads as "live" without being alarming.
+    static let recorder = Color(red: 0.90, green: 0.62, blue: 0.56)
+    /// Sage mint.
+    static let calendar = Color(red: 0.56, green: 0.80, blue: 0.71)
+    /// Cool slate blue for system accents: caret, selection, focus rings, sliders.
+    static let accent = Color(red: 0.62, green: 0.75, blue: 0.92)
+    /// Cool slate for the optional glass tint.
+    static let neutralTint = Color(red: 0.58, green: 0.65, blue: 0.76)
+}
+
+/// A 4-pt spacing scale so every panel breathes the same way.
+enum IslandSpacing {
+    static let xs: CGFloat = 4
+    static let s: CGFloat = 8
+    static let m: CGFloat = 12
+    static let l: CGFloat = 16
+}
+
+/// Shared motion, so the notch, its content and the controls all feel like one material.
+enum IslandMotion {
+    /// Opening has a touch of overshoot, like the island swelling out of the notch.
+    static let open = Animation.spring(response: 0.42, dampingFraction: 0.82)
+    /// Closing settles without bounce so it never rebounds past the notch.
+    static let close = Animation.spring(response: 0.34, dampingFraction: 0.94)
+    static let tab = Animation.smooth(duration: 0.3)
+    static let press = Animation.spring(response: 0.26, dampingFraction: 0.7)
+    static let hover = Animation.easeOut(duration: 0.16)
+}
+
+extension GlassBlur {
+    /// Each level is a visibly different frosting, so the setting is always perceptible.
+    var material: Material? {
+        switch self {
+        case .clear: nil
+        case .subtle: .ultraThinMaterial
+        case .balanced: .thinMaterial
+        case .strong: .regularMaterial
+        case .maximum: .ultraThickMaterial
+        }
+    }
 }
 
 extension View {
@@ -19,8 +63,7 @@ extension View {
     ) -> some View {
         background {
             ZStack {
-                InactiveGlassBackground(blur: clear ? .subtle : blur)
-                    .clipShape(shape)
+                if let material = blur.material { shape.fill(material) }
                 if clear { shape.fill(Color.white.opacity(0.05)) }
                 if let tint { shape.fill(tint.opacity(0.2 * tintStrength)) }
             }
@@ -28,43 +71,76 @@ extension View {
         .overlay {
             Group {
                 if refraction, #available(macOS 26.0, *) {
+                    // "Clear" and "Subtle" keep the see-through lens; stronger levels use the frosted one.
                     shape.fill(Color.white.opacity(0.001))
-                        .glassEffect(.clear, in: shape)
+                        .glassEffect(blur == .clear || blur == .subtle ? .clear : .regular, in: shape)
                 }
             }
             .allowsHitTesting(false)
         }
         .overlay {
-            shape.stroke(.white.opacity(0.08), lineWidth: 0.5)
-                .allowsHitTesting(false)
+            // Specular edge: bright where light would catch the top-leading corner, fading away
+            // across the glass, with a faint return along the bottom edge.
+            shape.stroke(
+                LinearGradient(
+                    stops: [
+                        .init(color: .white.opacity(0.22), location: 0),
+                        .init(color: .white.opacity(0.05), location: 0.45),
+                        .init(color: .white.opacity(0.11), location: 1)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 0.75
+            )
+            .allowsHitTesting(false)
         }
+    }
+
+    /// Glass for small controls. On macOS 26 this is real, interactive Liquid Glass with
+    /// refraction; earlier systems get the layered material fallback.
+    @ViewBuilder
+    func controlGlass<S: Shape>(_ shape: S, tint: Color? = nil) -> some View {
+        if #available(macOS 26.0, *) {
+            if let tint {
+                self.glassEffect(.regular.tint(tint.opacity(0.28)).interactive(), in: shape)
+            } else {
+                self.glassEffect(.regular.interactive(), in: shape)
+            }
+        } else {
+            self.islandGlass(shape, tint: tint)
+        }
+    }
+
+    /// Soft highlight while the pointer is over a control.
+    func hoverHighlight<S: Shape>(_ shape: S) -> some View {
+        modifier(HoverHighlight(shape: shape))
     }
 }
 
-private struct InactiveGlassBackground: NSViewRepresentable {
-    let blur: GlassBlur
+private struct HoverHighlight<S: Shape>: ViewModifier {
+    let shape: S
+    @State private var hovering = false
 
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.blendingMode = .behindWindow
-        view.state = .inactive
-        view.isEmphasized = false
-        view.material = material
-        return view
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                shape.fill(Color.white.opacity(hovering ? 0.10 : 0))
+                    .allowsHitTesting(false)
+            }
+            .onHover { inside in
+                withAnimation(IslandMotion.hover) { hovering = inside }
+            }
     }
+}
 
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {
-        view.state = .inactive
-        view.isEmphasized = false
-        view.material = material
-    }
-
-    private var material: NSVisualEffectView.Material {
-        switch blur {
-        case .subtle, .balanced: .underWindowBackground
-        case .strong: .hudWindow
-        case .maximum: .fullScreenUI
-        }
+/// Springy press feedback shared by every glass control.
+struct GlassPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .opacity(configuration.isPressed ? 0.88 : 1)
+            .animation(IslandMotion.press, value: configuration.isPressed)
     }
 }
 
@@ -84,8 +160,9 @@ struct GlassIconButton: View {
                 .frame(width: size, height: size)
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
-        .islandGlass(Circle(), tint: tint)
+        .buttonStyle(GlassPressStyle())
+        .controlGlass(Circle(), tint: tint)
+        .hoverHighlight(Circle())
         .accessibilityLabel(label)
         .help(label)
     }
@@ -112,8 +189,10 @@ struct GlassChip: View {
             .padding(.vertical, 6)
             .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassPressStyle())
         .disabled(isDisabled)
-        .islandGlass(Capsule(), tint: isSelected ? tint : nil)
+        .controlGlass(Capsule(), tint: isSelected ? tint : nil)
+        .hoverHighlight(Capsule())
+        .animation(IslandMotion.hover, value: isSelected)
     }
 }

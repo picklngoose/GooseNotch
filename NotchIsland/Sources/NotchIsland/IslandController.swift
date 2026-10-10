@@ -7,11 +7,14 @@ final class IslandSession: ObservableObject {
     @Published var isExpanded = false
     @Published var geometry: NotchGeometry
     @Published private(set) var hasActivity = false
+    /// An event about to start; shown as a countdown beside the closed notch.
+    @Published private(set) var upcomingEvent: CalendarEvent?
 
     let timer: TimerController
     let recorder: RecorderController
     let music: MusicController
     let chat: ChatController
+    let calendar: CalendarController
     let appearance: IslandAppearance
     var openSettings: (() -> Void)?
     @Published var tab: IslandTab = .timer
@@ -19,12 +22,12 @@ final class IslandSession: ObservableObject {
 
     /// The assistant and music tabs are taller; timer and recorder share the compact height.
     static func expandedHeight(for tab: IslandTab) -> CGFloat {
-        tab == .chat || tab == .music ? IslandMetrics.chatHeight : IslandMetrics.expandedSize.height
+        tab == .chat || tab == .music || tab == .calendar ? IslandMetrics.chatHeight : IslandMetrics.expandedSize.height
     }
     var expandedHeight: CGFloat { Self.expandedHeight(for: tab) }
     var activityWingWidth: CGFloat {
         let configuredWidth = CGFloat(appearance.activityWingWidth)
-        if music.isPlaying && !timer.isRunning && !recorder.isRecording {
+        if music.isPlaying && !timer.isRunning && !recorder.isRecording && upcomingEvent == nil {
             return min(configuredWidth, 24)
         }
         return configuredWidth
@@ -34,6 +37,7 @@ final class IslandSession: ObservableObject {
         let timer = TimerController()
         let recorder = RecorderController()
         let music = MusicController()
+        self.calendar = CalendarController()
         self.timer = timer
         self.recorder = recorder
         self.music = music
@@ -41,16 +45,28 @@ final class IslandSession: ObservableObject {
         self.appearance = appearance
         self.geometry = geometry
 
-        Publishers.CombineLatest3(timer.$isRunning, recorder.$isRecording, music.$isPlaying)
-            .map { $0 || $1 || $2 }
+        Publishers.CombineLatest(calendar.$soonEvent, appearance.$showEventAlerts)
+            .map { event, enabled in enabled ? event : nil }
             .removeDuplicates()
-            .sink { [weak self] active in self?.hasActivity = active }
+            .sink { [weak self] event in self?.upcomingEvent = event }
             .store(in: &bag)
+
+        Publishers.CombineLatest4(
+            timer.$isRunning,
+            recorder.$isRecording,
+            music.$isPlaying,
+            $upcomingEvent.map { $0 != nil }
+        )
+        .map { $0 || $1 || $2 || $3 }
+        .removeDuplicates()
+        .sink { [weak self] active in self?.hasActivity = active }
+        .store(in: &bag)
     }
 
     func quit() {
         recorder.stop()
         music.stop()
+        calendar.stop()
         NSApp.terminate(nil)
     }
 }
@@ -63,6 +79,8 @@ final class IslandController {
     private let settingsWindowController: AppearanceSettingsWindowController
     private var screenObserver: NSObjectProtocol?
     private var bag = Set<AnyCancellable>()
+    /// True while the appearance window is open: the island stays expanded so edits are visible.
+    private var settingsPinned = false
 
     init() {
         let geometry = NotchGeometry.current() ?? NotchGeometry(
@@ -84,7 +102,8 @@ final class IslandController {
                 appearance: session.appearance,
                 timer: session.timer,
                 recorder: session.recorder,
-                music: session.music
+                music: session.music,
+                calendar: session.calendar
             )
         )
         hosting.safeAreaRegions = []
@@ -93,11 +112,20 @@ final class IslandController {
         panel.contentView = hosting
 
         hover.onHoverChange = { [weak self] hovering in
-            self?.setExpanded(hovering)
+            guard let self else { return }
+            self.setExpanded(hovering || self.settingsPinned)
+        }
+        settingsWindowController.onVisibilityChange = { [weak self] visible in
+            guard let self else { return }
+            self.settingsPinned = visible
+            // On close, fall back to wherever the pointer actually is.
+            self.setExpanded(visible || self.hover.isPointerInside)
         }
         hover.onRightClick = { [weak self] in self?.settingsWindowController.show() }
         hover.start()
         session.music.start()
+        // Only reads the current authorization state; the permission prompt waits for a click.
+        session.calendar.start()
 
         // Keep the panel visible (as a compact live activity) while a timer or recording runs.
         session.$hasActivity
@@ -109,10 +137,11 @@ final class IslandController {
             }
             .store(in: &bag)
 
-        Publishers.CombineLatest3(
+        Publishers.CombineLatest4(
             session.timer.$isRunning,
             session.recorder.$isRecording,
-            session.music.$isPlaying
+            session.music.$isPlaying,
+            session.$upcomingEvent.map { $0 != nil }
         )
         .dropFirst()
         .receive(on: DispatchQueue.main)
@@ -159,6 +188,7 @@ final class IslandController {
     func shutdown() {
         session.recorder.stop()
         session.music.stop()
+        session.calendar.stop()
     }
 
     private func setExpanded(_ expanded: Bool) {
@@ -172,6 +202,17 @@ final class IslandController {
 
         refreshVisibility()
         updateHover()
+        if !expanded { releaseKeyboardFocusWhenClosed() }
+    }
+
+    /// The island can take keyboard focus (chat, timer entry). Once it has closed it must give
+    /// that up, or the invisible panel would swallow typing meant for the app underneath.
+    private func releaseKeyboardFocusWhenClosed() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
+            guard let self, !self.session.isExpanded, self.panel.isKeyWindow else { return }
+            self.panel.orderOut(nil)
+            if self.session.hasActivity { self.panel.orderFrontRegardless() }
+        }
     }
 
     private func updateHover(expandedHeight: CGFloat? = nil) {

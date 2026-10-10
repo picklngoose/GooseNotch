@@ -18,6 +18,9 @@ final class NotchHoverMonitor {
     private var collapseWork: DispatchWorkItem?
     private var lastInside = false
 
+    /// Whether the pointer was inside the island's area at the last mouse event.
+    var isPointerInside: Bool { lastInside }
+
     func start() {
         stop()
         let handler: (NSEvent) -> Void = { [weak self] _ in
