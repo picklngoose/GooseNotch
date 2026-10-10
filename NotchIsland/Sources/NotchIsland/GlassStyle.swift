@@ -24,6 +24,12 @@ extension View {
                 if let tint { shape.fill(tint.opacity(0.2 * tintStrength)) }
             }
         }
+        .overlay {
+            if #available(macOS 26.0, *) {
+                shape.fill(Color.white.opacity(0.001))
+                    .glassEffect(.clear, in: shape)
+            }
+        }
         .overlay { shape.stroke(.white.opacity(0.08), lineWidth: 0.5) }
     }
 }

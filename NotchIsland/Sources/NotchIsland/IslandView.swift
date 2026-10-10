@@ -178,9 +178,9 @@ struct IslandView: View {
         let zone = max((expandedWidth - 76 - notch.width) / 2 - 8, 60)
         return HStack(spacing: 0) {
             HStack(spacing: 6) {
+                tabChip(.music, icon: "music.note", label: "Music", tint: IslandPalette.music)
                 tabChip(.timer, icon: "timer", label: "Timer", tint: IslandPalette.timer)
                 tabChip(.chat, icon: "sparkles", label: "Assistant", tint: IslandPalette.assistant)
-                tabChip(.music, icon: "music.note", label: "Music", tint: IslandPalette.music)
             }
             .frame(width: zone, alignment: .leading)
 
