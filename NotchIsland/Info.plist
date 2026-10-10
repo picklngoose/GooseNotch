@@ -5,7 +5,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.example.NotchIsland</string>
     <key>CFBundleName</key>
-    <string>Notch Island</string>
+    <string>Goosenotch</string>
+    <key>CFBundleDisplayName</key>
+    <string>Goosenotch</string>
     <key>CFBundleExecutable</key>
     <string>NotchIsland</string>
     <key>CFBundlePackageType</key>
@@ -21,8 +23,8 @@
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Notch Island records voice memos from your microphone.</string>
+    <string>Goosenotch records voice memos from your microphone.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>Notch Island transcribes your voice memos live.</string>
+    <string>Goosenotch transcribes your voice memos live.</string>
 </dict>
 </plist>

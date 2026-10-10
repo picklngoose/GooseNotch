@@ -110,6 +110,21 @@ final class OllamaClient: Sendable {
 
     // MARK: Models
 
+    func prepareModel(_ model: String) async throws {
+        let body: [String: Any] = [
+            "model": model,
+            "prompt": "",
+            "stream": false,
+            "keep_alive": "5m",
+            "options": ["num_predict": 0]
+        ]
+        let data = try JSONSerialization.data(withJSONObject: body)
+        let (responseData, response) = try await session.data(for: makeRequest("/api/generate", body: data))
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw OllamaError.http(http.statusCode, Self.errorMessage(from: String(decoding: responseData, as: UTF8.self)))
+        }
+    }
+
     func listModels() async throws -> [String] {
         do {
             let (data, response) = try await session.data(for: try makeRequest("/api/tags"))

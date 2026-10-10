@@ -10,7 +10,7 @@ struct ChatPanel: View {
             if let error = chat.errorMessage {
                 Text(error)
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.red.opacity(0.9))
+                    .foregroundStyle(Color(red: 0.82, green: 0.52, blue: 0.48))
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -29,7 +29,7 @@ struct ChatPanel: View {
     private var messagesView: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 14) {
                     if chat.messages.isEmpty {
                         Text("Ask anything, or try “set a 10 minute timer”.")
                             .font(.system(size: 12))
@@ -66,7 +66,7 @@ struct ChatPanel: View {
                 systemName: chat.isBusy ? "stop.fill" : "arrow.up",
                 label: chat.isBusy ? "Stop" : "Send",
                 size: 28,
-                tint: .blue
+                tint: IslandPalette.assistant
             ) {
                 if chat.isBusy { chat.stop() } else { chat.send() }
             }
@@ -91,7 +91,7 @@ private struct MessageRow: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .islandGlass(RoundedRectangle(cornerRadius: 13, style: .continuous), tint: .blue)
+                    .islandGlass(RoundedRectangle(cornerRadius: 13, style: .continuous), tint: IslandPalette.assistant)
             }
         case .assistant:
             if !message.text.isEmpty {

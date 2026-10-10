@@ -66,6 +66,7 @@ final class ChatController: ObservableObject {
     @Published private(set) var messages: [Message] = []
     @Published var input = ""
     @Published private(set) var isBusy = false
+    @Published private(set) var isPreparingModel = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var models: [String] = []
     @Published var selectedModel: String {
@@ -77,6 +78,7 @@ final class ChatController: ObservableObject {
     private let recorder: RecorderController
     private var history: [ChatTurn] = []
     private var task: Task<Void, Never>?
+    private var modelPreparationTask: Task<Void, Never>?
 
     init(timer: TimerController, recorder: RecorderController) {
         self.timer = timer
@@ -92,12 +94,41 @@ final class ChatController: ObservableObject {
 
     // MARK: Models
 
+    var selectableModels: [String] {
+        guard !selectedModel.isEmpty, !models.contains(selectedModel) else { return models }
+        return (models + [selectedModel]).sorted()
+    }
+
+    func selectModel(_ model: String) {
+        let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !model.isEmpty, model != selectedModel else { return }
+
+        stop()
+        modelPreparationTask?.cancel()
+        selectedModel = model
+        errorMessage = nil
+        isPreparingModel = true
+
+        modelPreparationTask = Task { [weak self, client = self.client] in
+            do {
+                try await client.prepareModel(model)
+                guard let self, !Task.isCancelled, self.selectedModel == model else { return }
+                self.errorMessage = nil
+            } catch {
+                guard let self, !Task.isCancelled, self.selectedModel == model else { return }
+                self.errorMessage = error.localizedDescription
+            }
+            guard let self, self.selectedModel == model else { return }
+            self.isPreparingModel = false
+        }
+    }
+
     func refreshModels() {
         Task {
             do {
                 let list = try await client.listModels()
                 models = list
-                if selectedModel.isEmpty || !list.contains(selectedModel) {
+                if selectedModel.isEmpty {
                     selectedModel = list.first ?? ""
                 }
                 if !isBusy { errorMessage = nil }
@@ -150,7 +181,7 @@ final class ChatController: ObservableObject {
         f.dateStyle = .full
         f.timeStyle = .short
         return ChatTurn(role: "system", content: """
-            You are a fast, concise assistant that lives in the notch of the user's Mac. \
+            You are Jerry, a fast, concise assistant that lives in the notch of the user's Mac. \
             Keep replies to one to three sentences unless asked for more. \
             You can control the Mac's timer and voice recorder, open apps and URLs, and copy text to the clipboard \
             using tools. When the user asks you to do one of those things, call the tool instead of describing it. \

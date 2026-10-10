@@ -1,5 +1,11 @@
 import SwiftUI
 
+enum IslandPalette {
+    static let timer = Color(red: 0.72, green: 0.55, blue: 0.38)
+    static let assistant = Color(red: 0.38, green: 0.59, blue: 0.75)
+    static let recorder = Color(red: 0.68, green: 0.43, blue: 0.40)
+}
+
 // MARK: - Liquid Glass helpers
 //
 // On macOS 26+ these use the real Liquid Glass APIs (glassEffect / GlassEffectContainer).
@@ -8,7 +14,7 @@ import SwiftUI
 @available(macOS 26.0, *)
 private func makeIslandGlass(tint: Color?, interactive: Bool, clear: Bool) -> Glass {
     var glass = clear ? Glass.clear : Glass.regular
-    if let tint { glass = glass.tint(tint) }
+    if let tint { glass = glass.tint(tint.opacity(0.7)) }
     if interactive { glass = glass.interactive() }
     return glass
 }
@@ -21,9 +27,9 @@ extension View {
         } else {
             self.background {
                 shape.fill(clear ? AnyShapeStyle(Color.white.opacity(0.05)) : AnyShapeStyle(.ultraThinMaterial))
-                if let tint { shape.fill(tint.opacity(0.35)) }
+                if let tint { shape.fill(tint.opacity(0.2)) }
             }
-            .overlay { shape.stroke(.white.opacity(0.12), lineWidth: 0.5) }
+            .overlay { shape.stroke(.white.opacity(0.08), lineWidth: 0.5) }
         }
     }
 }

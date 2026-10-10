@@ -8,6 +8,8 @@ struct IslandView: View {
     @ObservedObject var session: IslandSession
     @ObservedObject var timer: TimerController
     @ObservedObject var recorder: RecorderController
+    @State private var showingModelPrompt = false
+    @State private var customModelName = ""
 
     private var tab: IslandTab { session.tab }
     private var expanded: Bool { session.isExpanded }
@@ -70,7 +72,7 @@ struct IslandView: View {
         .contextMenu {
             Button("Open Notch Memos Folder") { recorder.revealLastRecording() }
             Divider()
-            Button("Quit Notch Island") { session.quit() }
+            Button("Quit Goosenotch") { session.quit() }
         }
     }
 
@@ -113,7 +115,7 @@ struct IslandView: View {
                 LinearGradient(
                     stops: [
                         .init(color: .white.opacity(0), location: 0.3),
-                        .init(color: .white.opacity(0.55), location: 1)
+                        .init(color: .white.opacity(0.28), location: 1)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -154,8 +156,8 @@ struct IslandView: View {
         return HStack(spacing: 0) {
             GlassGroup(spacing: 6) {
                 HStack(spacing: 6) {
-                    tabChip(.timer, icon: "timer", label: "Timer", tint: .orange)
-                    tabChip(.chat, icon: "sparkles", label: "Assistant", tint: .blue)
+                    tabChip(.timer, icon: "timer", label: "Timer", tint: IslandPalette.timer)
+                    tabChip(.chat, icon: "sparkles", label: "Assistant", tint: IslandPalette.assistant)
                 }
             }
             .frame(width: zone, alignment: .leading)
@@ -164,7 +166,7 @@ struct IslandView: View {
 
             HStack(spacing: 6) {
                 if tab == .chat { modelMenu }
-                tabChip(.record, icon: "waveform", label: "Record", tint: .red)
+                tabChip(.record, icon: "waveform", label: "Record", tint: IslandPalette.recorder)
             }
             .frame(width: zone, alignment: .trailing)
         }
@@ -181,10 +183,10 @@ struct IslandView: View {
 
     private var modelMenu: some View {
         Menu {
-            if session.chat.models.isEmpty { Text("No models found") }
-            ForEach(session.chat.models, id: \.self) { name in
+            if session.chat.selectableModels.isEmpty { Text("No models found") }
+            ForEach(session.chat.selectableModels, id: \.self) { name in
                 Button {
-                    session.chat.selectedModel = name
+                    session.chat.selectModel(name)
                 } label: {
                     if name == session.chat.selectedModel {
                         Label(name, systemImage: "checkmark")
@@ -194,14 +196,21 @@ struct IslandView: View {
                 }
             }
             Divider()
+            Button("Add Model…") {
+                customModelName = ""
+                showingModelPrompt = true
+            }
             Button("Refresh Models") { session.chat.refreshModels() }
             Button("New Chat") { session.chat.clear() }
         } label: {
-            Text(session.chat.selectedModel.isEmpty ? "Model" : session.chat.selectedModel)
-                .font(.system(size: 11, weight: .medium))
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .foregroundStyle(.white)
+            HStack(spacing: 5) {
+                if session.chat.isPreparingModel { ProgressView().controlSize(.mini) }
+                Text(session.chat.selectedModel.isEmpty ? "Model" : session.chat.selectedModel)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(.white)
+            }
                 .frame(maxWidth: 52)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
@@ -211,6 +220,13 @@ struct IslandView: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
+        .alert("Add Ollama Model", isPresented: $showingModelPrompt) {
+            TextField("Model name", text: $customModelName)
+            Button("Cancel", role: .cancel) { customModelName = "" }
+            Button("Use Model") { session.chat.selectModel(customModelName) }
+        } message: {
+            Text("Enter a model name available to your local or signed-in Ollama account.")
+        }
     }
 
     // MARK: Collapsed "live activity" wings
@@ -241,7 +257,7 @@ struct IslandView: View {
         } else {
             Image(systemName: timer.mode == .countdown ? "timer" : "stopwatch")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.orange)
+                .foregroundStyle(IslandPalette.timer)
         }
     }
 
@@ -251,7 +267,7 @@ struct IslandView: View {
             Text(timer.formatted)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(.orange)
+                .foregroundStyle(IslandPalette.timer)
         } else if recorder.isRecording {
             Text(recorder.formattedElapsed)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -270,7 +286,7 @@ struct TimerPanel: View {
     @FocusState private var focused: Bool
 
     private let presets = [1, 5, 10, 25]
-    private let accent = Color.orange
+    private let accent = IslandPalette.timer
 
     var body: some View {
         VStack(spacing: 10) {
@@ -287,7 +303,7 @@ struct TimerPanel: View {
                             label: timer.isRunning ? "Pause" : "Start",
                             size: 46,
                             tint: accent
-                        ) { timer.toggle() }
+                        ) { toggleTimer() }
                     }
                 }
             }
@@ -391,6 +407,11 @@ struct TimerPanel: View {
         DispatchQueue.main.async { focused = true }
     }
 
+    private func toggleTimer() {
+        if isEditing { commitEdit() }
+        timer.toggle()
+    }
+
     private func commitEdit() {
         guard isEditing else { return }
         isEditing = false
@@ -447,7 +468,7 @@ struct RecorderPanel: View {
                     systemName: recorder.isRecording ? "stop.fill" : "mic.fill",
                     label: recorder.isRecording ? "Stop recording" : "Start recording",
                     size: 42,
-                    tint: .red
+                    tint: IslandPalette.recorder
                 ) { recorder.toggle() }
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -550,7 +571,7 @@ struct PulsingDot: View {
 
     var body: some View {
         Circle()
-            .fill(.red)
+            .fill(IslandPalette.recorder)
             .frame(width: 8, height: 8)
             .opacity(on ? 1 : 0.35)
             .onAppear {
