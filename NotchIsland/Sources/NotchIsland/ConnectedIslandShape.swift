@@ -11,6 +11,7 @@ struct ConnectedIslandShape: Shape {
     var notchWidth: CGFloat
     var notchHeight: CGFloat
     var activityWidth: CGFloat
+    var cornerRadius: CGFloat = IslandMetrics.contentCornerRadius
 
     var animatableData: AnimatablePair<CGFloat, CGFloat> {
         get { AnimatablePair(progress, activityProgress) }
@@ -33,7 +34,7 @@ struct ConnectedIslandShape: Shape {
 
         let baseRadius: CGFloat = 9
         let radius = min(
-            baseRadius + (IslandMetrics.contentCornerRadius - baseRadius) * p,
+            baseRadius + (cornerRadius - baseRadius) * p,
             bodyHeight / 2,
             bodyWidth / 2
         )

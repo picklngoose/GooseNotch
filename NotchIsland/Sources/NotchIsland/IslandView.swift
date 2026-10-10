@@ -6,6 +6,7 @@ enum IslandTab: Hashable {
 
 struct IslandView: View {
     @ObservedObject var session: IslandSession
+    @ObservedObject var appearance: IslandAppearance
     @ObservedObject var timer: TimerController
     @ObservedObject var recorder: RecorderController
     @State private var showingModelPrompt = false
@@ -13,7 +14,9 @@ struct IslandView: View {
 
     private var tab: IslandTab { session.tab }
     private var expanded: Bool { session.isExpanded }
-    private let wingWidth = IslandMetrics.activityWingWidth
+    private var wingWidth: CGFloat { CGFloat(appearance.activityWingWidth) }
+    private var expandedWidth: CGFloat { CGFloat(appearance.expandedWidth) }
+    private var cornerRadius: CGFloat { CGFloat(appearance.cornerRadius) }
 
     var body: some View {
         let notch = session.geometry.notchSize
@@ -43,9 +46,10 @@ struct IslandView: View {
                         activityProgress: expanded || !session.hasActivity ? 0 : 1,
                         notchWidth: notch.width,
                         notchHeight: notch.height,
-                        activityWidth: notch.width + wingWidth * 2
+                        activityWidth: notch.width + wingWidth * 2,
+                        cornerRadius: cornerRadius
                     )
-                    .frame(width: IslandMetrics.expandedSize.width, height: session.expandedHeight)
+                    .frame(width: expandedWidth, height: session.expandedHeight)
                 }
                 .allowsHitTesting(expanded)
         }
@@ -55,6 +59,7 @@ struct IslandView: View {
             alignment: .top
         )
         .environment(\.colorScheme, .dark)
+        .tint(Color(white: 0.78))
         .animation(
             expanded
                 ? Animation.spring(response: 0.38, dampingFraction: 0.84)
@@ -72,6 +77,7 @@ struct IslandView: View {
             }
         }
         .contextMenu {
+            Button("Notch Appearance…") { session.openSettings?() }
             Button("Open Notch Memos Folder") { recorder.revealLastRecording() }
             Divider()
             Button("Quit Goosenotch") { session.quit() }
@@ -87,11 +93,18 @@ struct IslandView: View {
             activityProgress: expanded || !session.hasActivity ? 0 : 1,
             notchWidth: notch.width,
             notchHeight: notch.height,
-            activityWidth: notch.width + wingWidth * 2
+            activityWidth: notch.width + wingWidth * 2,
+            cornerRadius: cornerRadius
         )
         ZStack {
             shape.fill(Color.black.opacity(0.01))
-                .islandGlass(shape, clear: true)
+                .islandGlass(
+                    shape,
+                    tint: appearance.tintStrength > 0 ? appearance.tintColor : nil,
+                    tintStrength: appearance.tintStrength,
+                    clear: appearance.blur == .subtle,
+                    blur: appearance.blur
+                )
                 .mask(
                     LinearGradient(
                         stops: [
@@ -114,12 +127,15 @@ struct IslandView: View {
                     endPoint: .bottom
                 )
             )
+            if appearance.tintStrength > 0 {
+                shape.fill(appearance.tintColor.opacity(appearance.tintStrength))
+            }
             // Thin bright rim that strengthens toward the bottom, like real glass edges.
             shape.stroke(
                 LinearGradient(
                     stops: [
                         .init(color: .white.opacity(0), location: 0.3),
-                        .init(color: .white.opacity(0.28), location: 1)
+                        .init(color: .white.opacity(0.28 * appearance.rimStrength), location: 1)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -127,7 +143,8 @@ struct IslandView: View {
                 lineWidth: 1
             )
         }
-        .frame(width: IslandMetrics.expandedSize.width, height: session.expandedHeight)
+        .opacity(appearance.opacity)
+        .frame(width: expandedWidth, height: session.expandedHeight)
     }
 
     // MARK: Expanded content
@@ -148,7 +165,7 @@ struct IslandView: View {
         .padding(.horizontal, 38)
         .padding(.bottom, 16)
         .frame(
-            width: IslandMetrics.expandedSize.width,
+            width: expandedWidth,
             height: session.expandedHeight,
             alignment: .top
         )
@@ -156,7 +173,7 @@ struct IslandView: View {
 
     /// Tabs sit level with the notch, split around it so nothing ends up underneath it.
     private func topRow(notch: NSSize) -> some View {
-        let zone = max((IslandMetrics.expandedSize.width - 76 - notch.width) / 2 - 8, 60)
+        let zone = max((expandedWidth - 76 - notch.width) / 2 - 8, 60)
         return HStack(spacing: 0) {
             GlassGroup(spacing: 6) {
                 HStack(spacing: 6) {

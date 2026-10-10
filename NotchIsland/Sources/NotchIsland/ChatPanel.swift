@@ -10,7 +10,7 @@ struct ChatPanel: View {
             if let error = chat.errorMessage {
                 Text(error)
                     .font(.system(size: 11))
-                    .foregroundStyle(Color(red: 0.82, green: 0.52, blue: 0.48))
+                    .foregroundStyle(Color.white.opacity(0.78))
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

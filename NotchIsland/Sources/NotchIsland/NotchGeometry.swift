@@ -10,8 +10,11 @@ struct NotchGeometry: Equatable {
     var notchSize: NSSize { notchFrame.size }
 
     /// Slightly larger than the visible collapsed shape so hover is easy to hit.
-    func hoverFrame(isActive: Bool = false) -> NSRect {
-        let horizontalInset = isActive ? IslandMetrics.activityWingWidth + 10 : 10
+    func hoverFrame(
+        isActive: Bool = false,
+        activityWingWidth: CGFloat = IslandMetrics.activityWingWidth
+    ) -> NSRect {
+        let horizontalInset = isActive ? activityWingWidth + 10 : 10
         return notchFrame.insetBy(dx: -horizontalInset, dy: -8)
     }
 
@@ -28,16 +31,18 @@ struct NotchGeometry: Equatable {
     func expandedHitFrame(
         isExpanded: Bool,
         isActive: Bool = false,
-        height: CGFloat = IslandMetrics.expandedSize.height
+        height: CGFloat = IslandMetrics.expandedSize.height,
+        width: CGFloat = IslandMetrics.expandedSize.width,
+        activityWingWidth: CGFloat = IslandMetrics.activityWingWidth
     ) -> NSRect {
-        guard isExpanded else { return hoverFrame(isActive: isActive) }
-        let size = NSSize(width: IslandMetrics.expandedSize.width, height: height)
+        guard isExpanded else { return hoverFrame(isActive: isActive, activityWingWidth: activityWingWidth) }
+        let size = NSSize(width: width, height: height)
         // Match the visible body exactly (the flared ears are only a few points tall).
-        let width = size.width - IslandMetrics.topFlare * 2
+        let bodyWidth = size.width - IslandMetrics.topFlare * 2
         return NSRect(
-            x: centerX - width / 2,
+            x: centerX - bodyWidth / 2,
             y: screenFrame.maxY - size.height,
-            width: width,
+            width: bodyWidth,
             height: size.height
         )
     }

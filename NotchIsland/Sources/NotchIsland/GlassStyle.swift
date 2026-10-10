@@ -1,9 +1,9 @@
 import SwiftUI
 
 enum IslandPalette {
-    static let timer = Color(red: 0.74, green: 0.54, blue: 0.34)
-    static let assistant = Color(red: 0.36, green: 0.58, blue: 0.77)
-    static let recorder = Color(red: 0.70, green: 0.41, blue: 0.37)
+    static let timer = Color(white: 0.78)
+    static let assistant = Color(white: 0.94)
+    static let recorder = Color(white: 0.64)
 }
 
 // MARK: - Liquid Glass helpers
@@ -12,22 +12,48 @@ enum IslandPalette {
 // On macOS 14–15 they fall back to system materials so the app still looks native.
 
 @available(macOS 26.0, *)
-private func makeIslandGlass(tint: Color?, interactive: Bool, clear: Bool) -> Glass {
-    var glass = clear ? Glass.clear : Glass.regular
-    if let tint { glass = glass.tint(tint.opacity(0.7)) }
+private func makeIslandGlass(
+    tint: Color?,
+    tintStrength: Double,
+    interactive: Bool,
+    clear: Bool,
+    blur: GlassBlur
+) -> Glass {
+    var glass = clear || blur == .subtle ? Glass.clear : Glass.regular
+    if let tint {
+        glass = glass.tint(tint.opacity(min(tintStrength + blur.tintBoost, 1)))
+    } else if blur.tintBoost > 0 {
+        glass = glass.tint(.white.opacity(blur.tintBoost))
+    }
     if interactive { glass = glass.interactive() }
     return glass
 }
 
 extension View {
     @ViewBuilder
-    func islandGlass<S: Shape>(_ shape: S, tint: Color? = nil, interactive: Bool = false, clear: Bool = false) -> some View {
+    func islandGlass<S: Shape>(
+        _ shape: S,
+        tint: Color? = nil,
+        tintStrength: Double = 0.7,
+        interactive: Bool = false,
+        clear: Bool = false,
+        blur: GlassBlur = .balanced
+    ) -> some View {
         if #available(macOS 26.0, *) {
-            self.glassEffect(makeIslandGlass(tint: tint, interactive: interactive, clear: clear), in: shape)
+            self.glassEffect(
+                makeIslandGlass(
+                    tint: tint,
+                    tintStrength: tintStrength,
+                    interactive: interactive,
+                    clear: clear,
+                    blur: blur
+                ),
+                in: shape
+            )
         } else {
             self.background {
-                shape.fill(clear ? AnyShapeStyle(Color.white.opacity(0.05)) : AnyShapeStyle(.ultraThinMaterial))
-                if let tint { shape.fill(tint.opacity(0.2)) }
+                shape.fill(clear ? AnyShapeStyle(Color.white.opacity(0.05)) : AnyShapeStyle(blur.material))
+                if let tint { shape.fill(tint.opacity(0.2 * tintStrength)) }
             }
             .overlay { shape.stroke(.white.opacity(0.08), lineWidth: 0.5) }
         }
@@ -75,7 +101,7 @@ struct GlassChip: View {
     let title: String
     var systemImage: String? = nil
     var isSelected = false
-    var tint: Color = .accentColor
+    var tint: Color = IslandPalette.assistant
     var isDisabled = false
     let action: () -> Void
 

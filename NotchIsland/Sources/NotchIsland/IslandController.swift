@@ -11,6 +11,8 @@ final class IslandSession: ObservableObject {
     let timer: TimerController
     let recorder: RecorderController
     let chat: ChatController
+    let appearance: IslandAppearance
+    var openSettings: (() -> Void)?
     @Published var tab: IslandTab = .timer
     private var bag = Set<AnyCancellable>()
 
@@ -20,12 +22,13 @@ final class IslandSession: ObservableObject {
     }
     var expandedHeight: CGFloat { Self.expandedHeight(for: tab) }
 
-    init(geometry: NotchGeometry) {
+    init(geometry: NotchGeometry, appearance: IslandAppearance) {
         let timer = TimerController()
         let recorder = RecorderController()
         self.timer = timer
         self.recorder = recorder
         self.chat = ChatController(timer: timer, recorder: recorder)
+        self.appearance = appearance
         self.geometry = geometry
 
         Publishers.CombineLatest(timer.$isRunning, recorder.$isRecording)
@@ -46,6 +49,7 @@ final class IslandController {
     private let session: IslandSession
     private let panel = NotchPanel()
     private let hover = NotchHoverMonitor()
+    private let settingsWindowController: AppearanceSettingsWindowController
     private var screenObserver: NSObjectProtocol?
     private var bag = Set<AnyCancellable>()
 
@@ -56,12 +60,20 @@ final class IslandController {
             notchFrame: NSRect(x: 0, y: 0, width: 160, height: 32),
             usingPhysicalNotch: false
         )
-        session = IslandSession(geometry: geometry)
+        let appearance = IslandAppearance()
+        session = IslandSession(geometry: geometry, appearance: appearance)
+        settingsWindowController = AppearanceSettingsWindowController(appearance: appearance)
     }
 
     func start() {
+        session.openSettings = { [weak self] in self?.settingsWindowController.show() }
         let hosting = IslandHostingView(
-            rootView: IslandView(session: session, timer: session.timer, recorder: session.recorder)
+            rootView: IslandView(
+                session: session,
+                appearance: session.appearance,
+                timer: session.timer,
+                recorder: session.recorder
+            )
         )
         hosting.safeAreaRegions = []
         hosting.wantsLayer = true
@@ -71,6 +83,7 @@ final class IslandController {
         hover.onHoverChange = { [weak self] hovering in
             self?.setExpanded(hovering)
         }
+        hover.onRightClick = { [weak self] in self?.settingsWindowController.show() }
         hover.start()
 
         // Keep the panel visible (as a compact live activity) while a timer or recording runs.
@@ -90,6 +103,18 @@ final class IslandController {
                 guard let self else { return }
                 self.updateHover(expandedHeight: IslandSession.expandedHeight(for: tab))
             }
+            .store(in: &bag)
+
+        session.appearance.$expandedWidth
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateHover() }
+            .store(in: &bag)
+
+        session.appearance.$activityWingWidth
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateHover() }
             .store(in: &bag)
 
         screenObserver = NotificationCenter.default.addObserver(
@@ -130,7 +155,9 @@ final class IslandController {
             geometry: session.geometry,
             isExpanded: session.isExpanded,
             isActive: session.hasActivity,
-            expandedHeight: expandedHeight ?? session.expandedHeight
+            expandedHeight: expandedHeight ?? session.expandedHeight,
+            expandedWidth: CGFloat(session.appearance.expandedWidth),
+            activityWingWidth: CGFloat(session.appearance.activityWingWidth)
         )
     }
 
