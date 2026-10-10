@@ -68,9 +68,9 @@ final class MusicController: ObservableObject {
         guard !refreshInFlight else { return }
         refreshInFlight = true
         let knownTrackID = trackID
-        worker.async {
+        worker.async { [weak self] in
             let result = Self.fetchSnapshot(knownTrackID: knownTrackID)
-            Task { @MainActor [weak self] in
+            Task { @MainActor in
                 self?.apply(result)
             }
         }
@@ -80,7 +80,7 @@ final class MusicController: ObservableObject {
         guard isAvailable, !commandInFlight else { return }
         commandInFlight = true
         let commandName = command.rawValue
-        worker.async {
+        worker.async { [weak self] in
             let failureMessage: String?
             switch Self.execute(
                 """
@@ -92,7 +92,7 @@ final class MusicController: ObservableObject {
             case let .failure(message):
                 failureMessage = message
             }
-            Task { @MainActor [weak self] in
+            Task { @MainActor in
                 guard let self else { return }
                 self.commandInFlight = false
                 self.errorMessage = failureMessage
@@ -200,12 +200,13 @@ final class MusicController: ObservableObject {
             return .failure("Could not prepare an Apple Music command.")
         }
         var error: NSDictionary?
-        guard let descriptor = script.executeAndReturnError(&error) else {
-            let number = error?["NSAppleScriptErrorNumber"] as? Int
+        let descriptor = script.executeAndReturnError(&error)
+        if let error {
+            let number = error["NSAppleScriptErrorNumber"] as? Int
             if number == -1743 {
                 return .failure("Allow Goosenotch to control Apple Music in System Settings > Privacy & Security > Automation.")
             }
-            let message = error?["NSAppleScriptErrorMessage"] as? String
+            let message = error["NSAppleScriptErrorMessage"] as? String
             return .failure(message ?? "Apple Music did not respond to the request.")
         }
         return .success(descriptor)
