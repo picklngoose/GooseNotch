@@ -26,9 +26,11 @@ extension View {
             }
         }
         .overlay {
-            if refraction, #available(macOS 26.0, *) {
-                shape.fill(Color.white.opacity(0.001))
-                    .glassEffect(.clear, in: shape)
+            Group {
+                if refraction, #available(macOS 26.0, *) {
+                    shape.fill(Color.white.opacity(0.001))
+                        .glassEffect(.clear, in: shape)
+                }
             }
             .allowsHitTesting(false)
         }
