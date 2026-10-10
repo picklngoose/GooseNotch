@@ -29,8 +29,12 @@ extension View {
                 shape.fill(Color.white.opacity(0.001))
                     .glassEffect(.clear, in: shape)
             }
+            .allowsHitTesting(false)
         }
-        .overlay { shape.stroke(.white.opacity(0.08), lineWidth: 0.5) }
+        .overlay {
+            shape.stroke(.white.opacity(0.08), lineWidth: 0.5)
+                .allowsHitTesting(false)
+        }
     }
 }
 
