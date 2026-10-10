@@ -10,29 +10,32 @@ final class IslandSession: ObservableObject {
 
     let timer: TimerController
     let recorder: RecorderController
+    let music: MusicController
     let chat: ChatController
     let appearance: IslandAppearance
     var openSettings: (() -> Void)?
     @Published var tab: IslandTab = .timer
     private var bag = Set<AnyCancellable>()
 
-    /// Only the assistant tab is taller; timer and recorder share the compact height.
+    /// The assistant and music tabs are taller; timer and recorder share the compact height.
     static func expandedHeight(for tab: IslandTab) -> CGFloat {
-        tab == .chat ? IslandMetrics.chatHeight : IslandMetrics.expandedSize.height
+        tab == .chat || tab == .music ? IslandMetrics.chatHeight : IslandMetrics.expandedSize.height
     }
     var expandedHeight: CGFloat { Self.expandedHeight(for: tab) }
 
     init(geometry: NotchGeometry, appearance: IslandAppearance) {
         let timer = TimerController()
         let recorder = RecorderController()
+        let music = MusicController()
         self.timer = timer
         self.recorder = recorder
+        self.music = music
         self.chat = ChatController(timer: timer, recorder: recorder)
         self.appearance = appearance
         self.geometry = geometry
 
-        Publishers.CombineLatest(timer.$isRunning, recorder.$isRecording)
-            .map { $0 || $1 }
+        Publishers.CombineLatest3(timer.$isRunning, recorder.$isRecording, music.$isPlaying)
+            .map { $0 || $1 || $2 }
             .removeDuplicates()
             .sink { [weak self] active in self?.hasActivity = active }
             .store(in: &bag)
@@ -40,6 +43,7 @@ final class IslandSession: ObservableObject {
 
     func quit() {
         recorder.stop()
+        music.stop()
         NSApp.terminate(nil)
     }
 }
@@ -72,7 +76,8 @@ final class IslandController {
                 session: session,
                 appearance: session.appearance,
                 timer: session.timer,
-                recorder: session.recorder
+                recorder: session.recorder,
+                music: session.music
             )
         )
         hosting.safeAreaRegions = []
@@ -85,6 +90,7 @@ final class IslandController {
         }
         hover.onRightClick = { [weak self] in self?.settingsWindowController.show() }
         hover.start()
+        session.music.start()
 
         // Keep the panel visible (as a compact live activity) while a timer or recording runs.
         session.$hasActivity
@@ -135,6 +141,7 @@ final class IslandController {
 
     func shutdown() {
         session.recorder.stop()
+        session.music.stop()
     }
 
     private func setExpanded(_ expanded: Bool) {

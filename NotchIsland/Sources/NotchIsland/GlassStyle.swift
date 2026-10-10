@@ -3,6 +3,7 @@ import SwiftUI
 enum IslandPalette {
     static let timer = Color(white: 0.78)
     static let assistant = Color(white: 0.94)
+    static let music = Color(white: 0.86)
     static let recorder = Color(white: 0.64)
 }
 
@@ -15,7 +16,6 @@ enum IslandPalette {
 private func makeIslandGlass(
     tint: Color?,
     tintStrength: Double,
-    interactive: Bool,
     clear: Bool,
     blur: GlassBlur
 ) -> Glass {
@@ -25,7 +25,6 @@ private func makeIslandGlass(
     } else if blur.tintBoost > 0 {
         glass = glass.tint(.white.opacity(blur.tintBoost))
     }
-    if interactive { glass = glass.interactive() }
     return glass
 }
 
@@ -35,7 +34,6 @@ extension View {
         _ shape: S,
         tint: Color? = nil,
         tintStrength: Double = 0.7,
-        interactive: Bool = false,
         clear: Bool = false,
         blur: GlassBlur = .balanced
     ) -> some View {
@@ -44,7 +42,6 @@ extension View {
                 makeIslandGlass(
                     tint: tint,
                     tintStrength: tintStrength,
-                    interactive: interactive,
                     clear: clear,
                     blur: blur
                 ),
@@ -91,7 +88,7 @@ struct GlassIconButton: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .islandGlass(Circle(), tint: tint, interactive: true)
+        .islandGlass(Circle(), tint: tint)
         .accessibilityLabel(label)
         .help(label)
     }
@@ -120,6 +117,6 @@ struct GlassChip: View {
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
-        .islandGlass(Capsule(), tint: isSelected ? tint : nil, interactive: true)
+        .islandGlass(Capsule(), tint: isSelected ? tint : nil)
     }
 }

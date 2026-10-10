@@ -24,6 +24,8 @@
     <true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>Goosenotch records voice memos from your microphone.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Goosenotch reads the current track and controls playback in Apple Music.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>Goosenotch transcribes your voice memos live.</string>
 </dict>

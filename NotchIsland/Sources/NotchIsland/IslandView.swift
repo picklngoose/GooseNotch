@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum IslandTab: Hashable {
-    case timer, chat, record
+    case timer, chat, music, record
 }
 
 struct IslandView: View {
@@ -9,6 +9,7 @@ struct IslandView: View {
     @ObservedObject var appearance: IslandAppearance
     @ObservedObject var timer: TimerController
     @ObservedObject var recorder: RecorderController
+    @ObservedObject var music: MusicController
     @State private var showingModelPrompt = false
     @State private var customModelName = ""
 
@@ -156,6 +157,7 @@ struct IslandView: View {
                 switch tab {
                 case .timer: TimerPanel(timer: timer)
                 case .chat: ChatPanel(chat: session.chat)
+                case .music: MusicPanel(music: music)
                 case .record: RecorderPanel(recorder: recorder)
                 }
             }
@@ -179,6 +181,7 @@ struct IslandView: View {
                 HStack(spacing: 6) {
                     tabChip(.timer, icon: "timer", label: "Timer", tint: IslandPalette.timer)
                     tabChip(.chat, icon: "sparkles", label: "Assistant", tint: IslandPalette.assistant)
+                    tabChip(.music, icon: "music.note", label: "Music", tint: IslandPalette.music)
                 }
             }
             .frame(width: zone, alignment: .leading)
@@ -235,7 +238,7 @@ struct IslandView: View {
                 .frame(maxWidth: 52)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .islandGlass(Capsule(), interactive: true)
+                .islandGlass(Capsule())
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
@@ -269,6 +272,9 @@ struct IslandView: View {
                 MiniMeter(levels: Array(recorder.levels.suffix(5)))
                     .frame(width: 22, height: 14)
             }
+        } else if music.isPlaying {
+            MusicVisualizer(isPlaying: true, barCount: 5)
+                .frame(width: 22, height: 14)
         } else {
             Image(systemName: timer.mode == .countdown ? "timer" : "stopwatch")
                 .font(.system(size: 12, weight: .semibold))
@@ -288,6 +294,12 @@ struct IslandView: View {
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.white)
+        } else if music.isPlaying {
+            Text(music.trackTitle)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
     }
 }
