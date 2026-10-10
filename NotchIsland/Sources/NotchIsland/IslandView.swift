@@ -294,12 +294,6 @@ struct IslandView: View {
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.white)
-        } else if music.isPlaying {
-            Text(music.trackTitle)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .truncationMode(.tail)
         }
     }
 }

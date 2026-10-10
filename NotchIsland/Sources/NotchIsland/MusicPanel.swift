@@ -121,7 +121,7 @@ struct MusicVisualizer: View {
     var barCount = 20
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 0.1, paused: !isPlaying)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !isPlaying)) { timeline in
             HStack(alignment: .center, spacing: 2) {
                 ForEach(0..<barCount, id: \.self) { index in
                     let time = timeline.date.timeIntervalSinceReferenceDate

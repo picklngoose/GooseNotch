@@ -25,7 +25,7 @@ struct ConnectedIslandShape: Shape {
         let p = min(max(progress, 0), 1)
         let active = min(max(activityProgress, 0), 1)
         let maxFlare = IslandMetrics.topFlare
-        let flare = maxFlare * p
+        let flare = maxFlare * max(p, active)
 
         let maxBodyWidth = rect.width - maxFlare * 2
         let collapsedWidth = notchWidth + (activityWidth - notchWidth) * active
