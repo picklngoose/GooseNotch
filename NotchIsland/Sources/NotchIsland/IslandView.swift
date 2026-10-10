@@ -15,7 +15,7 @@ struct IslandView: View {
 
     private var tab: IslandTab { session.tab }
     private var expanded: Bool { session.isExpanded }
-    private var wingWidth: CGFloat { CGFloat(appearance.activityWingWidth) }
+    private var wingWidth: CGFloat { session.activityWingWidth }
     private var expandedWidth: CGFloat { CGFloat(appearance.expandedWidth) }
     private var cornerRadius: CGFloat { CGFloat(appearance.cornerRadius) }
 
@@ -177,12 +177,10 @@ struct IslandView: View {
     private func topRow(notch: NSSize) -> some View {
         let zone = max((expandedWidth - 76 - notch.width) / 2 - 8, 60)
         return HStack(spacing: 0) {
-            GlassGroup(spacing: 6) {
-                HStack(spacing: 6) {
-                    tabChip(.timer, icon: "timer", label: "Timer", tint: IslandPalette.timer)
-                    tabChip(.chat, icon: "sparkles", label: "Assistant", tint: IslandPalette.assistant)
-                    tabChip(.music, icon: "music.note", label: "Music", tint: IslandPalette.music)
-                }
+            HStack(spacing: 6) {
+                tabChip(.timer, icon: "timer", label: "Timer", tint: IslandPalette.timer)
+                tabChip(.chat, icon: "sparkles", label: "Assistant", tint: IslandPalette.assistant)
+                tabChip(.music, icon: "music.note", label: "Music", tint: IslandPalette.music)
             }
             .frame(width: zone, alignment: .leading)
 
@@ -314,50 +312,44 @@ struct TimerPanel: View {
             HStack {
                 timeDisplay
                 Spacer()
-                GlassGroup(spacing: 12) {
-                    HStack(spacing: 10) {
-                        GlassIconButton(systemName: "arrow.counterclockwise", label: "Reset", size: 38) {
-                            timer.reset()
-                        }
-                        GlassIconButton(
-                            systemName: timer.isRunning ? "pause.fill" : "play.fill",
-                            label: timer.isRunning ? "Pause" : "Start",
-                            size: 46,
-                            tint: accent
-                        ) { toggleTimer() }
+                HStack(spacing: 10) {
+                    GlassIconButton(systemName: "arrow.counterclockwise", label: "Reset", size: 38) {
+                        timer.reset()
                     }
+                    GlassIconButton(
+                        systemName: timer.isRunning ? "pause.fill" : "play.fill",
+                        label: timer.isRunning ? "Pause" : "Start",
+                        size: 46,
+                        tint: accent
+                    ) { toggleTimer() }
                 }
             }
 
             progressBar
 
             HStack(spacing: 8) {
-                GlassGroup(spacing: 8) {
-                    HStack(spacing: 6) {
-                        if timer.mode == .countdown {
-                            ForEach(presets, id: \.self) { minutes in
-                                GlassChip(
-                                    title: "\(minutes)m",
-                                    isSelected: timer.duration == TimeInterval(minutes * 60),
-                                    tint: accent,
-                                    isDisabled: timer.isRunning
-                                ) { timer.setMinutes(minutes) }
-                            }
+                HStack(spacing: 6) {
+                    if timer.mode == .countdown {
+                        ForEach(presets, id: \.self) { minutes in
+                            GlassChip(
+                                title: "\(minutes)m",
+                                isSelected: timer.duration == TimeInterval(minutes * 60),
+                                tint: accent,
+                                isDisabled: timer.isRunning
+                            ) { timer.setMinutes(minutes) }
                         }
                     }
                 }
                 Spacer()
-                GlassGroup(spacing: 8) {
-                    HStack(spacing: 6) {
-                        GlassChip(title: "", systemImage: "hourglass", isSelected: timer.mode == .countdown, tint: accent) {
-                            timer.mode = .countdown
-                        }
-                        .accessibilityLabel("Countdown")
-                        GlassChip(title: "", systemImage: "stopwatch", isSelected: timer.mode == .stopwatch, tint: accent) {
-                            timer.mode = .stopwatch
-                        }
-                        .accessibilityLabel("Stopwatch")
+                HStack(spacing: 6) {
+                    GlassChip(title: "", systemImage: "hourglass", isSelected: timer.mode == .countdown, tint: accent) {
+                        timer.mode = .countdown
                     }
+                    .accessibilityLabel("Countdown")
+                    GlassChip(title: "", systemImage: "stopwatch", isSelected: timer.mode == .stopwatch, tint: accent) {
+                        timer.mode = .stopwatch
+                    }
+                    .accessibilityLabel("Stopwatch")
                 }
             }
         }
@@ -508,17 +500,15 @@ struct RecorderPanel: View {
                     LevelMeter(levels: recorder.levels)
                         .frame(width: 72, height: 28)
                 } else if recorder.lastRecordingURL != nil {
-                    GlassGroup(spacing: 8) {
-                        HStack(spacing: 8) {
-                            GlassIconButton(systemName: "folder", label: "Show in Finder", size: 30) {
-                                recorder.revealLastRecording()
-                            }
-                            GlassIconButton(systemName: "waveform", label: "Open in Voice Memos", size: 30) {
-                                recorder.openInVoiceMemos()
-                            }
-                            GlassIconButton(systemName: "doc.on.doc", label: "Copy transcript", size: 30) {
-                                recorder.copyTranscript()
-                            }
+                    HStack(spacing: 8) {
+                        GlassIconButton(systemName: "folder", label: "Show in Finder", size: 30) {
+                            recorder.revealLastRecording()
+                        }
+                        GlassIconButton(systemName: "waveform", label: "Open in Voice Memos", size: 30) {
+                            recorder.openInVoiceMemos()
+                        }
+                        GlassIconButton(systemName: "doc.on.doc", label: "Copy transcript", size: 30) {
+                            recorder.copyTranscript()
                         }
                     }
                 }

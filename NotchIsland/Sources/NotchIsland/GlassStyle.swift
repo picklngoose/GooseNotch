@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum IslandPalette {
@@ -7,29 +8,7 @@ enum IslandPalette {
     static let recorder = Color(white: 0.64)
 }
 
-// MARK: - Liquid Glass helpers
-//
-// On macOS 26+ these use the real Liquid Glass APIs (glassEffect / GlassEffectContainer).
-// On macOS 14–15 they fall back to system materials so the app still looks native.
-
-@available(macOS 26.0, *)
-private func makeIslandGlass(
-    tint: Color?,
-    tintStrength: Double,
-    clear: Bool,
-    blur: GlassBlur
-) -> Glass {
-    var glass = clear || blur == .subtle ? Glass.clear : Glass.regular
-    if let tint {
-        glass = glass.tint(tint.opacity(min(tintStrength + blur.tintBoost, 1)))
-    } else if blur.tintBoost > 0 {
-        glass = glass.tint(.white.opacity(blur.tintBoost))
-    }
-    return glass
-}
-
 extension View {
-    @ViewBuilder
     func islandGlass<S: Shape>(
         _ shape: S,
         tint: Color? = nil,
@@ -37,36 +16,41 @@ extension View {
         clear: Bool = false,
         blur: GlassBlur = .balanced
     ) -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(
-                makeIslandGlass(
-                    tint: tint,
-                    tintStrength: tintStrength,
-                    clear: clear,
-                    blur: blur
-                ),
-                in: shape
-            )
-        } else {
-            self.background {
-                shape.fill(clear ? AnyShapeStyle(Color.white.opacity(0.05)) : AnyShapeStyle(blur.material))
+        background {
+            ZStack {
+                InactiveGlassBackground(blur: clear ? .subtle : blur)
+                    .clipShape(shape)
+                if clear { shape.fill(Color.white.opacity(0.05)) }
                 if let tint { shape.fill(tint.opacity(0.2 * tintStrength)) }
             }
-            .overlay { shape.stroke(.white.opacity(0.08), lineWidth: 0.5) }
         }
+        .overlay { shape.stroke(.white.opacity(0.08), lineWidth: 0.5) }
     }
 }
 
-/// Groups nearby glass elements so they blend and morph together (macOS 26+).
-struct GlassGroup<Content: View>: View {
-    var spacing: CGFloat = 12
-    @ViewBuilder var content: Content
+private struct InactiveGlassBackground: NSViewRepresentable {
+    let blur: GlassBlur
 
-    var body: some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: spacing) { content }
-        } else {
-            content
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.blendingMode = .behindWindow
+        view.state = .inactive
+        view.isEmphasized = false
+        view.material = material
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.state = .inactive
+        view.isEmphasized = false
+        view.material = material
+    }
+
+    private var material: NSVisualEffectView.Material {
+        switch blur {
+        case .subtle, .balanced: .underWindowBackground
+        case .strong: .hudWindow
+        case .maximum: .fullScreenUI
         }
     }
 }

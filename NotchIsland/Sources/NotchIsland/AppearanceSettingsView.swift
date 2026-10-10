@@ -18,22 +18,6 @@ enum GlassBlur: String, CaseIterable, Hashable, Identifiable {
         }
     }
 
-    var material: Material {
-        switch self {
-        case .subtle: .ultraThinMaterial
-        case .balanced: .ultraThinMaterial
-        case .strong: .regularMaterial
-        case .maximum: .thickMaterial
-        }
-    }
-
-    var tintBoost: Double {
-        switch self {
-        case .subtle, .balanced: 0
-        case .strong: 0.12
-        case .maximum: 0.24
-        }
-    }
 }
 
 @MainActor

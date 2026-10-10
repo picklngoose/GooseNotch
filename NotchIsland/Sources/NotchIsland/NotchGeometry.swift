@@ -14,7 +14,7 @@ struct NotchGeometry: Equatable {
         isActive: Bool = false,
         activityWingWidth: CGFloat = IslandMetrics.activityWingWidth
     ) -> NSRect {
-        let horizontalInset = isActive ? activityWingWidth + 10 : 10
+        let horizontalInset = isActive ? activityWingWidth + IslandMetrics.topFlare + 10 : 10
         return notchFrame.insetBy(dx: -horizontalInset, dy: -8)
     }
 
@@ -37,12 +37,10 @@ struct NotchGeometry: Equatable {
     ) -> NSRect {
         guard isExpanded else { return hoverFrame(isActive: isActive, activityWingWidth: activityWingWidth) }
         let size = NSSize(width: width, height: height)
-        // Match the visible body exactly (the flared ears are only a few points tall).
-        let bodyWidth = size.width - IslandMetrics.topFlare * 2
         return NSRect(
-            x: centerX - bodyWidth / 2,
+            x: centerX - size.width / 2,
             y: screenFrame.maxY - size.height,
-            width: bodyWidth,
+            width: size.width,
             height: size.height
         )
     }

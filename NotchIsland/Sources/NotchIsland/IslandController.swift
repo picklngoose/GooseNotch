@@ -22,6 +22,13 @@ final class IslandSession: ObservableObject {
         tab == .chat || tab == .music ? IslandMetrics.chatHeight : IslandMetrics.expandedSize.height
     }
     var expandedHeight: CGFloat { Self.expandedHeight(for: tab) }
+    var activityWingWidth: CGFloat {
+        let configuredWidth = CGFloat(appearance.activityWingWidth)
+        if music.isPlaying && !timer.isRunning && !recorder.isRecording {
+            return min(configuredWidth, 24)
+        }
+        return configuredWidth
+    }
 
     init(geometry: NotchGeometry, appearance: IslandAppearance) {
         let timer = TimerController()
@@ -102,6 +109,16 @@ final class IslandController {
             }
             .store(in: &bag)
 
+        Publishers.CombineLatest3(
+            session.timer.$isRunning,
+            session.recorder.$isRecording,
+            session.music.$isPlaying
+        )
+        .dropFirst()
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] _ in self?.updateHover() }
+        .store(in: &bag)
+
         // Keep the hover area in step with the island's height when switching tabs.
         session.$tab
             .receive(on: DispatchQueue.main)
@@ -164,7 +181,7 @@ final class IslandController {
             isActive: session.hasActivity,
             expandedHeight: expandedHeight ?? session.expandedHeight,
             expandedWidth: CGFloat(session.appearance.expandedWidth),
-            activityWingWidth: CGFloat(session.appearance.activityWingWidth)
+            activityWingWidth: session.activityWingWidth
         )
     }
 
