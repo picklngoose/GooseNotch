@@ -13,18 +13,18 @@ struct IslandView: View {
 
     private var tab: IslandTab { session.tab }
     private var expanded: Bool { session.isExpanded }
-    private let wingWidth: CGFloat = 78
+    private let wingWidth = IslandMetrics.activityWingWidth
 
     var body: some View {
         let notch = session.geometry.notchSize
 
         ZStack(alignment: .top) {
+            islandBody(notch: notch)
+
             if !expanded && session.hasActivity {
                 wings(notch: notch)
                     .transition(.opacity)
             }
-
-            islandBody(notch: notch)
 
             // Content stays in the tree and is clipped by the (animating) island shape, so on
             // collapse it looks like the notch closes around it instead of the content vanishing.
@@ -40,8 +40,10 @@ struct IslandView: View {
                 .mask(alignment: .top) {
                     ConnectedIslandShape(
                         progress: expanded ? 1 : 0,
+                        activityProgress: expanded || !session.hasActivity ? 0 : 1,
                         notchWidth: notch.width,
-                        notchHeight: notch.height
+                        notchHeight: notch.height,
+                        activityWidth: notch.width + wingWidth * 2
                     )
                     .frame(width: IslandMetrics.expandedSize.width, height: session.expandedHeight)
                 }
@@ -82,8 +84,10 @@ struct IslandView: View {
     private func islandBody(notch: NSSize) -> some View {
         let shape = ConnectedIslandShape(
             progress: expanded ? 1 : 0,
+            activityProgress: expanded || !session.hasActivity ? 0 : 1,
             notchWidth: notch.width,
-            notchHeight: notch.height
+            notchHeight: notch.height,
+            activityWidth: notch.width + wingWidth * 2
         )
         ZStack {
             shape.fill(Color.black.opacity(0.01))
@@ -232,18 +236,12 @@ struct IslandView: View {
     // MARK: Collapsed "live activity" wings
 
     private func wings(notch: NSSize) -> some View {
-        ZStack(alignment: .top) {
-            UnevenRoundedRectangle(bottomLeadingRadius: 14, bottomTrailingRadius: 14)
-                .fill(Color.black)
-                .frame(width: notch.width + wingWidth * 2, height: notch.height)
-
-            HStack(spacing: 0) {
-                leftWing.frame(width: wingWidth)
-                Color.clear.frame(width: notch.width)
-                rightWing.frame(width: wingWidth)
-            }
-            .frame(height: notch.height)
+        HStack(spacing: 0) {
+            leftWing.frame(width: wingWidth)
+            Color.clear.frame(width: notch.width)
+            rightWing.frame(width: wingWidth)
         }
+        .frame(height: notch.height)
     }
 
     @ViewBuilder

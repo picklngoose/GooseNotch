@@ -8,6 +8,7 @@ final class NotchHoverMonitor {
     private var globalMonitor: Any?
     private var geometry: NotchGeometry?
     private var isExpanded = false
+    private var isActive = false
     private var expandedHeight = IslandMetrics.expandedSize.height
     private var collapseWork: DispatchWorkItem?
     private var lastInside = false
@@ -36,9 +37,15 @@ final class NotchHoverMonitor {
         collapseWork?.cancel()
     }
 
-    func update(geometry: NotchGeometry, isExpanded: Bool, expandedHeight: CGFloat? = nil) {
+    func update(
+        geometry: NotchGeometry,
+        isExpanded: Bool,
+        isActive: Bool = false,
+        expandedHeight: CGFloat? = nil
+    ) {
         self.geometry = geometry
         self.isExpanded = isExpanded
+        self.isActive = isActive
         if let expandedHeight { self.expandedHeight = expandedHeight }
         evaluate()
     }
@@ -46,7 +53,8 @@ final class NotchHoverMonitor {
     private func evaluate() {
         guard let geometry else { return }
         let point = NSEvent.mouseLocation
-        let inside = geometry.hoverFrame.contains(point) || geometry.expandedHitFrame(isExpanded: isExpanded, height: expandedHeight).contains(point)
+        let inside = geometry.hoverFrame(isActive: isActive).contains(point)
+            || geometry.expandedHitFrame(isExpanded: isExpanded, isActive: isActive, height: expandedHeight).contains(point)
 
         if inside {
             collapseWork?.cancel()

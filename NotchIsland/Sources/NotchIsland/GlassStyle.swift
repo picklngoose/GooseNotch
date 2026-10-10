@@ -1,9 +1,9 @@
 import SwiftUI
 
 enum IslandPalette {
-    static let timer = Color(red: 0.72, green: 0.55, blue: 0.38)
-    static let assistant = Color(red: 0.38, green: 0.59, blue: 0.75)
-    static let recorder = Color(red: 0.68, green: 0.43, blue: 0.40)
+    static let timer = Color(red: 0.74, green: 0.54, blue: 0.34)
+    static let assistant = Color(red: 0.36, green: 0.58, blue: 0.77)
+    static let recorder = Color(red: 0.70, green: 0.41, blue: 0.37)
 }
 
 // MARK: - Liquid Glass helpers

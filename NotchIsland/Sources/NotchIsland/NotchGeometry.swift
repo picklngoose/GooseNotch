@@ -9,9 +9,10 @@ struct NotchGeometry: Equatable {
     var centerX: CGFloat { notchFrame.midX }
     var notchSize: NSSize { notchFrame.size }
 
-    /// Slightly larger than the physical notch so hover is easy to hit.
-    var hoverFrame: NSRect {
-        notchFrame.insetBy(dx: -10, dy: -8)
+    /// Slightly larger than the visible collapsed shape so hover is easy to hit.
+    func hoverFrame(isActive: Bool = false) -> NSRect {
+        let horizontalInset = isActive ? IslandMetrics.activityWingWidth + 10 : 10
+        return notchFrame.insetBy(dx: -horizontalInset, dy: -8)
     }
 
     var windowFrame: NSRect {
@@ -24,8 +25,12 @@ struct NotchGeometry: Equatable {
         )
     }
 
-    func expandedHitFrame(isExpanded: Bool, height: CGFloat = IslandMetrics.expandedSize.height) -> NSRect {
-        guard isExpanded else { return hoverFrame }
+    func expandedHitFrame(
+        isExpanded: Bool,
+        isActive: Bool = false,
+        height: CGFloat = IslandMetrics.expandedSize.height
+    ) -> NSRect {
+        guard isExpanded else { return hoverFrame(isActive: isActive) }
         let size = NSSize(width: IslandMetrics.expandedSize.width, height: height)
         // Match the visible body exactly (the flared ears are only a few points tall).
         let width = size.width - IslandMetrics.topFlare * 2
@@ -103,6 +108,7 @@ struct NotchGeometry: Equatable {
 enum IslandMetrics {
     // Taller than the original so the transcript has room.
     static let expandedSize = NSSize(width: 540, height: 184)
+    static let activityWingWidth: CGFloat = 78
     static let chatHeight: CGFloat = 236
     // Tall enough for the largest tab (chat) plus a little margin.
     static let windowSize = NSSize(width: 572, height: 256)

@@ -76,7 +76,11 @@ final class IslandController {
         // Keep the panel visible (as a compact live activity) while a timer or recording runs.
         session.$hasActivity
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.refreshVisibility() }
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.refreshVisibility()
+                self.updateHover()
+            }
             .store(in: &bag)
 
         // Keep the hover area in step with the island's height when switching tabs.
@@ -84,11 +88,7 @@ final class IslandController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] tab in
                 guard let self else { return }
-                self.hover.update(
-                    geometry: self.session.geometry,
-                    isExpanded: self.session.isExpanded,
-                    expandedHeight: IslandSession.expandedHeight(for: tab)
-                )
+                self.updateHover(expandedHeight: IslandSession.expandedHeight(for: tab))
             }
             .store(in: &bag)
 
@@ -112,14 +112,9 @@ final class IslandController {
         session.recorder.stop()
     }
 
-    func openMemosFolder() {
-        try? FileManager.default.createDirectory(at: RecorderController.memosFolder, withIntermediateDirectories: true)
-        NSWorkspace.shared.open(RecorderController.memosFolder)
-    }
-
     private func setExpanded(_ expanded: Bool) {
         guard expanded != session.isExpanded else {
-            hover.update(geometry: session.geometry, isExpanded: session.isExpanded)
+            updateHover()
             return
         }
 
@@ -127,7 +122,16 @@ final class IslandController {
         session.isExpanded = expanded
 
         refreshVisibility()
-        hover.update(geometry: session.geometry, isExpanded: session.isExpanded)
+        updateHover()
+    }
+
+    private func updateHover(expandedHeight: CGFloat? = nil) {
+        hover.update(
+            geometry: session.geometry,
+            isExpanded: session.isExpanded,
+            isActive: session.hasActivity,
+            expandedHeight: expandedHeight ?? session.expandedHeight
+        )
     }
 
     private func refreshVisibility() {
@@ -149,6 +153,6 @@ final class IslandController {
         guard let next = NotchGeometry.current() else { return }
         session.geometry = next
         panel.setFrame(next.windowFrame, display: true)
-        hover.update(geometry: next, isExpanded: session.isExpanded)
+        updateHover()
     }
 }

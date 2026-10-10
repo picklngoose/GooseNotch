@@ -2,26 +2,33 @@ import SwiftUI
 
 /// A single black body that grows out of the physical notch.
 ///
-/// Collapsed it is exactly the notch. Expanded it is a wide body flush with the top of the
-/// screen, with concave "ears" flaring outward at the top corners (like the notch's own
-/// silhouette) and rounded bottom corners.
+/// Collapsed it matches the notch, or widens for live activity. Expanded it is a wide body flush
+/// with the top of the screen, with concave "ears" flaring outward at the top corners and rounded
+/// bottom corners.
 struct ConnectedIslandShape: Shape {
     var progress: CGFloat
+    var activityProgress: CGFloat
     var notchWidth: CGFloat
     var notchHeight: CGFloat
+    var activityWidth: CGFloat
 
-    var animatableData: CGFloat {
-        get { progress }
-        set { progress = newValue }
+    var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(progress, activityProgress) }
+        set {
+            progress = newValue.first
+            activityProgress = newValue.second
+        }
     }
 
     func path(in rect: CGRect) -> Path {
         let p = min(max(progress, 0), 1)
+        let active = min(max(activityProgress, 0), 1)
         let maxFlare = IslandMetrics.topFlare
         let flare = maxFlare * p
 
         let maxBodyWidth = rect.width - maxFlare * 2
-        let bodyWidth = notchWidth + (maxBodyWidth - notchWidth) * p
+        let collapsedWidth = notchWidth + (activityWidth - notchWidth) * active
+        let bodyWidth = collapsedWidth + (maxBodyWidth - collapsedWidth) * p
         let bodyHeight = notchHeight + (rect.height - notchHeight) * p
 
         let baseRadius: CGFloat = 9
