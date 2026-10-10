@@ -104,7 +104,8 @@ struct IslandView: View {
                     tint: appearance.tintStrength > 0 ? appearance.tintColor : nil,
                     tintStrength: appearance.tintStrength,
                     clear: appearance.blur == .subtle,
-                    blur: appearance.blur
+                    blur: appearance.blur,
+                    refraction: true
                 )
                 .mask(
                     LinearGradient(

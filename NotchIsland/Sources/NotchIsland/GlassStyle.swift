@@ -14,7 +14,8 @@ extension View {
         tint: Color? = nil,
         tintStrength: Double = 0.7,
         clear: Bool = false,
-        blur: GlassBlur = .balanced
+        blur: GlassBlur = .balanced,
+        refraction: Bool = false
     ) -> some View {
         background {
             ZStack {
@@ -25,7 +26,7 @@ extension View {
             }
         }
         .overlay {
-            if #available(macOS 26.0, *) {
+            if refraction, #available(macOS 26.0, *) {
                 shape.fill(Color.white.opacity(0.001))
                     .glassEffect(.clear, in: shape)
             }
